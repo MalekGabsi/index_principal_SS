@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+    <head>
+
+        <meta charset="UTF-8">
+
+        <title>Inscription ;)</title> 
+
+    <style>
+        body {font-family: Arial, sans-serif;
+            margin:0; background:#e9e9e9;
+            display:flex; justify-content:center;
+            align-items:center; height:100vh;}
+        
+        .container {display:flex;
+            background:white;
+            border-radius:15px;
+            box-shadow:0 5px 20px
+            rgba(0,0,0,0.15);
+            overflow:hidden;
+            width:800px;
+            height:500px;}
+            
+        .left {flex:1;
+            background:#f7f7f7;
+            padding:20px;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            position:relative;}
+        .right {flex:1;
+            padding:30px;
+            display:flex;
+            flex-direction:column;
+            justify-content:center;}
+            
+        h2 {text-align:center;}
+        
+        #niveau {width:90%;
+            height:20px;
+            background:#ddd;
+            border-radius:10px;
+            overflow:hidden;
+            margin:15px 0;}
+
+        #barre {height:100%;
+            width:0%;
+            background:limegreen;
+            transition:width 0.1s linear;}
+
+        .lettreContainer {display:flex;
+            justify-content:center;
+            margin-top:20px;
+            margin-bottom:10px;}
+
+        .lettreZone {display:flex;
+            flex-direction:column;
+            align-items:center;
+            margin:0 15px;}
+
+        .lettreZone span {font-size:50px;
+            font-weight:bold;
+            margin-bottom:5px;}
+
+        .btnAdd {padding:10px 15px;
+            font-size:18px;
+            display:none;}
+
+        #effacerBtn {margin-top:10px; 
+            padding:10px 20px; 
+            font-size:16px; 
+            display:none;}
+
+        #clavier {display:none; 
+            position:fixed; 
+            top:0; 
+            left:0; 
+            width:100%; 
+            height:100%; 
+            pointer-events:none;}
+
+        #clavier button {position:absolute; 
+            margin:0; 
+            padding:10px 12px; 
+            border-radius:6px; 
+            cursor:pointer; 
+            font-size:16px; 
+            border:1px solid #ccc;
+            background:#eee; 
+            pointer-events:auto;}
+
+        #clavier button:hover {background:#ddd;}
+        
+        input {width:calc(100% - 100px); 
+            padding:10px; 
+            margin-bottom:15px; 
+            font-size:16px; 
+            border-radius:6px; 
+            border:1px solid #ccc; 
+            box-sizing:border-box;}
+            
+        input:focus {border-color:#4CAF50; 
+            outline:none;}
+
+        .fieldRow {display:flex; 
+            align-items:center; 
+            margin-bottom:15px;}
+            
+        .fieldRow button {width:80px; 
+            margin-left:10px; 
+            padding:10px; 
+            border-radius:6px; border:none; 
+            background:#4CAF50; 
+            color:white; 
+            cursor:pointer;
+            display:none;}
+        
+        .fieldRow button:hover {background:#45a049;} 
+    </style>
+
+    </head>
+
+    <body> 
+        
+        <div class="container"> 
+            <div class="left">
+                <h2 id="leftTitle">Micro</h2>
+                <div id="niveau"><div id="barre"></div></div>
+                <p id="valeur">0%</p>
+
+                <div class="lettreContainer">
+                    <div class="lettreZone">
+                        <span id="lettre"></span>
+                        <button id="ajouterBtn" class="btnAdd">Ajouter</button>
+                    </div>
+                    <div class="lettreZone">
+                        <span id="lettreMaj"></span>
+                        <button id="ajouterMajBtn" class="btnAdd">Ajouter</button>
+                    </div>
+                </div>
+
+                <button id="effacerBtn">Effacer</button> 
+                <div id="clavier"></div>
+            </div>
+
+            <div class="right">
+                <h2>Formulaire</h2>
+                <div class="fieldRow">
+                    <input type="text" id="nom" placeholder="Nom" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                    <button id="validerNom">Valider</button>
+                </div>
+                <div class="fieldRow">
+                    <input type="text" id="prenom" placeholder="Prénom" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                    <button id="validerPrenom">Valider</button>
+                </div>
+                <div class="fieldRow">
+                    <input type="email" id="email" placeholder="Adresse mail" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                    <button id="validerEmail">Envoyer</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let activeInput = document.getElementById("nom");
+            activeInput.removeAttribute("readonly");
+            document.getElementById("validerNom").style.display="inline-block";
+
+            const inputs = document.querySelectorAll("#nom, #prenom, #email");
+            inputs.forEach(input => ["keydown","keypress","input","paste"].forEach(ev=>input.addEventListener(ev,e=>e.preventDefault())));
+
+            function setActive(input){ activeInput=input; input.removeAttribute("readonly"); input.focus(); }
+
+            let charsEntered = 0;
+            let movingKeys = false;
+            let keyboardButtons = []; 
+
+            function addChar(c){
+                if(activeInput) activeInput.value += c;
+                charsEntered++;
+                if(charsEntered >= 3 && !movingKeys){
+                    movingKeys = true;
+                    moveKeys();
+                }
+            }
+
+            // Micro
+            navigator.mediaDevices.getUserMedia({ audio:true })
+            .then(stream=>{
+                const audioContext = new AudioContext();
+                const source = audioContext.createMediaStreamSource(stream);
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                const symbols = ["0","1","2","3","4","5","6","7","8","9",".","_","-","@"];
+                const startPercent = 75;
+
+                function analyse(){
+                    analyser.getByteTimeDomainData(dataArray);
+                    let sum = 0;
+                    for(let i=0;i<dataArray.length;i++) sum += Math.abs(dataArray[i]-128);
+                    let niveau = (sum/dataArray.length)/(128*0.35)*100;//changer le 0.5 pour la sensibilité (plus = moins sensible et inversement)
+                    niveau = Math.max(0, Math.min(100, Math.round(niveau))); //jauge du micro
+
+                    document.getElementById("barre").style.width = niveau+"%";
+                    document.getElementById("valeur").innerText = niveau+"%";
+
+                    let leftChar="", rightChar="";
+                    if(niveau >= startPercent){
+                        let index = Math.floor((niveau-startPercent)/3)*2;
+                        if(index >= symbols.length) index = symbols.length-2;
+                        leftChar = symbols[index];
+                        rightChar = symbols[index+1];
+                    } else {
+                        const letters="abcdefghijklmnopqrstuvwxyz";
+                        let letterIndex = Math.floor(niveau/3); //attribution des pourcentages 3% pour chaque lettres
+                        if(letterIndex >= letters.length) letterIndex = letters.length-1;
+                        leftChar = letters[letterIndex];
+                        rightChar = leftChar.toUpperCase();
+                    }
+
+                    document.getElementById("lettre").innerText = leftChar;
+                    document.getElementById("lettreMaj").innerText = rightChar;
+
+                    ["ajouterBtn","ajouterMajBtn","effacerBtn"].forEach(id=>document.getElementById(id).style.display="inline-block");
+
+                    document.getElementById("ajouterBtn").onclick = ()=>addChar(leftChar); //bouton "ajouter une lettre minuscule"
+                    document.getElementById("ajouterMajBtn").onclick = ()=>addChar(rightChar); //bouton "ajouter une lettre majuscule"
+                    document.getElementById("effacerBtn").onclick = ()=>{ if(activeInput) activeInput.value=activeInput.value.slice(0,-1); }; //bouton "effacer"
+
+                    requestAnimationFrame(analyse);
+                }
+                analyse(); //appel de la fonction analyse
+            })
+            .catch(err=>{ // Cas du "accès au micro refusém"
+                console.warn("Micro non disponible, utilisation du clavier virtuel !");
+                document.getElementById("leftTitle").innerText="Clavier virtuel";
+                ["niveau","barre","valeur"].forEach(id=>document.getElementById(id).style.display="none");
+                document.querySelector(".lettreContainer").style.display="none";
+                document.getElementById("effacerBtn").style.display="none";
+
+                const clavierDiv = document.getElementById("clavier");
+                clavierDiv.style.display="block";
+
+                const characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-@".split('');
+                characters.forEach(c=>{
+                    const btn = document.createElement("button");
+                    btn.textContent = c;
+                    btn.onclick = ()=> addChar(c);
+                    btn.style.left = Math.random()*(window.innerWidth-40)+"px";
+                    btn.style.top = Math.random()*(window.innerHeight-40)+"px";
+                    btn.dataset.vx = 0; btn.dataset.vy = 0;
+                    clavierDiv.appendChild(btn);
+                    keyboardButtons.push(btn);
+                });
+
+                // Bouton effacer qui bouge
+                const btnEffacer = document.createElement("button");
+                btnEffacer.textContent = "Effacer"; btnEffacer.style.background="#f44336"; btnEffacer.style.color="white";
+                btnEffacer.onclick = ()=>{ if(activeInput) activeInput.value = activeInput.value.slice(0,-1); };
+                btnEffacer.style.left = Math.random()*(window.innerWidth-80)+"px";
+                btnEffacer.style.top = Math.random()*(window.innerHeight-40)+"px";
+                btnEffacer.dataset.vx = 0; btnEffacer.dataset.vy = 0;
+                clavierDiv.appendChild(btnEffacer);
+                keyboardButtons.push(btnEffacer);
+            });
+
+            // Fonction pour faire bouger les lettres
+            function moveKeys(){
+                keyboardButtons.forEach(btn=>{
+                    const angle = Math.random()*2*Math.PI;
+                    const speed = 0.5 + Math.random()*0.5; // Changer le 0,5 du début pour avoir une vitesse constante plus élevé
+                    btn.dataset.vx = Math.cos(angle)*speed;
+                    btn.dataset.vy = Math.sin(angle)*speed;
+                });
+
+                setInterval(()=>{
+                    keyboardButtons.forEach(btn=>{
+                        let x = parseFloat(btn.style.left);
+                        let y = parseFloat(btn.style.top);
+                        let vx = parseFloat(btn.dataset.vx);
+                        let vy = parseFloat(btn.dataset.vy);
+                        x += vx; y += vy;
+
+                        // Rebond des lettres sur les bords
+                        if(x<0 || x>window.innerWidth-btn.offsetWidth){ btn.dataset.vx = -vx; x = Math.max(0, Math.min(x, window.innerWidth-btn.offsetWidth)); }
+                        if(y<0 || y>window.innerHeight-btn.offsetHeight){ btn.dataset.vy = -vy; y = Math.max(0, Math.min(y, window.innerHeight-btn.offsetHeight)); }
+
+                        btn.style.left = x+"px";
+                        btn.style.top = y+"px";
+                    });
+                },20);
+            }
+
+            // Boutonn valider du nom, prénom, adresse
+            document.getElementById("validerNom").onclick = ()=>{ 
+                document.getElementById("nom").setAttribute("readonly", true);
+                document.getElementById("validerNom").style.display="none";
+                setActive(document.getElementById("prenom"));
+                document.getElementById("validerPrenom").style.display="inline-block";
+            };
+            document.getElementById("validerPrenom").onclick = ()=>{ 
+                document.getElementById("prenom").setAttribute("readonly", true);
+                document.getElementById("validerPrenom").style.display="none";
+                setActive(document.getElementById("email"));
+                document.getElementById("validerEmail").style.display="inline-block";
+            };
+            document.getElementById("validerEmail").onclick = ()=>{ 
+                document.getElementById("email").setAttribute("readonly", true);
+                const nom = document.getElementById("nom").value;
+                const prenom = document.getElementById("prenom").value;
+                const email = document.getElementById("email").value;
+                if(!nom || !prenom || !email){ alert("Veuillez remplir tous les champs"); return; }
+                alert(`Nom: ${nom}\nPrénom: ${prenom}\nEmail: ${email}`);
+            };
+        </script>
+
+    </body>
+
+</html>
